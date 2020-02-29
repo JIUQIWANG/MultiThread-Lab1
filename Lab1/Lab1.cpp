@@ -25,66 +25,124 @@ bool comparisonPlayLine(const playline& a, const playline& b) // compare functio
 {
     return a.linenumber < b.linenumber;
 }
-class player
-{
-private:
-    vector<playline> contents;
-};
 class play
 {
 private:
     string playName;
-    vector<playline> contents;
     int counter;
+    static string current_player;
 public:
-    explicit play(string name) : playName(move(name)),counter(0)
+    explicit play(string name) : playName(move(name)), counter(1)
     {
     }
-    play& operator<<(const playline& argument)
-    {
-        lock_guard<mutex> guard(current_mutex); // Every time we get access to the contents list, we need to acquire the mutex first.
-        contents.push_back(argument);
-        return *this;
-    }
+    //play& operator<<(const playline& argument)
+    //{
+    //    lock_guard<mutex> guard(current_mutex); // Every time we get access to the contents list, we need to acquire the mutex first.
+    //    contents.push_back(argument);
+    //    return *this;
+    //}
     string getName()
     {
         return playName;
     }
-    void print(ostream& theStream)
-    {
-        lock_guard<mutex> guard(current_mutex);
-        sort(contents.begin(), contents.end(), comparisonPlayLine); // sort the class member vector by using the number of line.
-        string current;
+    //void print(ostream& theStream)
+    //{
+    //    lock_guard<mutex> guard(current_mutex);
+    //    sort(contents.begin(), contents.end(), comparisonPlayLine); // sort the class member vector by using the number of line.
+    //    string current;
 
-        for (int i = 0; i < contents.size(); i++) // print the playline one by one.
-        {
-            if (i == 0)
-            {
-                theStream << contents[i].rolename << "." << endl;
-                theStream << contents[i].linetext << endl;
-                current = contents[i].rolename;
-            }
-            else
-            {
-                if (current != contents[i].rolename)
-                {
-                    theStream << endl;
-                    theStream << contents[i].rolename << "." << endl;
-                    current = contents[i].rolename;
-                }
-                theStream << contents[i].linetext << endl;
-            }
-        }
-    }
-    void recite(vector<playline>::iterator &contentIte)
+    //    for (int i = 0; i < contents.size(); i++) // print the playline one by one.
+    //    {
+    //        if (i == 0)
+    //        {
+    //            theStream << contents[i].rolename << "." << endl;
+    //            theStream << contents[i].linetext << endl;
+    //            current = contents[i].rolename;
+    //        }
+    //        else
+    //        {
+    //            if (current != contents[i].rolename)
+    //            {
+    //                theStream << endl;
+    //                theStream << contents[i].rolename << "." << endl;
+    //                current = contents[i].rolename;
+    //            }
+    //            theStream << contents[i].linetext << endl;
+    //        }
+    //    }
+    //}
+    void recite(vector<playline>::iterator& contentIte)
     {
         unique_lock<mutex> lock(current_mutex);
-        if (counter < (*contentIte).linenumber)
+        data_cond.wait(lock, [this, &contentIte] {
+            if (this->counter > (*contentIte).linenumber)
+            {
+                cerr << "counter is greater than line number" << endl;
+                contentIte++;
+                data_cond.notify_all();
+                return false;
+            }
+            return this->counter == (*contentIte).linenumber; });
+        if (current_player.empty())
         {
+            current_player = (*contentIte).rolename;
+            cout << current_player << "." << endl;
+        }
+        else if (current_player != (*contentIte).rolename)
+        {
+            cout << endl;
+            current_player = (*contentIte).rolename;
+            cout << current_player << "." << endl;
+        }
 
+        cout << (*contentIte).linetext << endl;
+        this->counter++;
+        contentIte++;
+        data_cond.notify_all();
+    }
+};
+class player
+{
+private:
+    vector<playline> contents;
+    string* playName;
+    ifstream* input;
+    play* current_play;
+    thread current_thread;
+public:
+    player(play& obj, string &playerName, ifstream &input)
+    {
+        this->playName = &playerName;
+        this->input = &input;
+        this->current_play = &obj;
+        current_thread = thread();
+    }
+    void read()
+    {
+        if (input->is_open())
+        {
+            while (!input->eof())
+            {
+                playline newLine;
+                string line;
+                getline(*input, line);
+                if (line.empty() || line == " ") // Check given line is empty or only have space. if yes, continue.
+                {
+                    continue;
+                }
+                string::size_type pos;
+                pos = line.find(' ', 0); // split given line text from first space.
+                string thisLineNumber, thisLineText;
+                thisLineNumber = line.substr(0, pos);
+                thisLineText = line.substr(pos + 1);
+                newLine.linenumber = stoi(thisLineNumber);
+                newLine.linetext = trim(thisLineText);
+                newLine.rolename = *playName;
+            }
         }
     }
 };
+
 string& trim(string& ss) // used to remove the beginning spaces from each given string
 {
     string::size_type pos = ss.find_first_not_of(" \t");
