@@ -135,6 +135,10 @@ public:
                 string thisLineNumber, thisLineText;
                 thisLineNumber = line.substr(0, pos);
                 thisLineText = line.substr(pos + 1);
+                if (thisLineText.empty() || !is_number(thisLineNumber)) // judge two part of string is legal or not. first part need to be a Integer, second part should not be equal to empty string
+                {
+                    continue;
+                }
                 newLine.linenumber = stoi(thisLineNumber);
                 newLine.linetext = trim(thisLineText);
                 newLine.rolename = *playName;
