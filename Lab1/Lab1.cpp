@@ -108,14 +108,14 @@ private:
     string* playName;
     ifstream* input;
     play* current_play;
-    thread current_thread;
+    thread *current_thread;
 public:
     player(play& obj, string &playerName, ifstream &input)
     {
         this->playName = &playerName;
         this->input = &input;
         this->current_play = &obj;
-        current_thread = thread();
+        current_thread = &thread();
     }
     void read()
     {
@@ -143,6 +143,26 @@ public:
                 newLine.linetext = trim(thisLineText);
                 newLine.rolename = *playName;
             }
+        }
+    }
+    void act()
+    {
+        vector<playline>::iterator current_begin = contents.begin();
+        for (; current_begin < contents.end(); )
+        {
+            current_play->recite(current_begin);
+        }
+        return;
+    }
+    void enter()
+    {
+        current_thread = move(new thread([this] {read(); act(); }));
+    }
+    void exit()
+    {
+        if (current_thread->joinable())
+        {
+            current_thread->join();
         }
     }
 };
