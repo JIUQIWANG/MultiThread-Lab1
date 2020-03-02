@@ -1,5 +1,6 @@
 
 #include <algorithm>
+#include <condition_variable>
 #include <exception>
 #include <fstream>
 #include <iostream>
@@ -8,11 +9,10 @@
 #include <thread>
 #include <utility>
 #include <vector>
-#include <condition_variable>
 #define PROGRAM_NAME 0
 
 using namespace std;
-mutex current_mutex;    // mutex variable used to control play class acess
+mutex current_mutex; // mutex variable used to control play class acess
 condition_variable data_cond;
 typedef struct playline // playline class, each line in the play correspond each playline class
 {
@@ -21,7 +21,7 @@ typedef struct playline // playline class, each line in the play correspond each
     string linetext;
 } playline;
 
-bool comparisonPlayLine(const playline& a, const playline& b) // compare function used to sort the playline in play class using the number of line
+bool comparisonPlayLine(const playline &a, const playline &b) // compare function used to sort the playline in play class using the number of line
 {
     return a.linenumber < b.linenumber;
 }
@@ -31,6 +31,7 @@ private:
     string playName;
     int counter;
     static string current_player;
+
 public:
     explicit play(string name) : playName(move(name)), counter(1)
     {
@@ -71,7 +72,7 @@ public:
     //        }
     //    }
     //}
-    void recite(vector<playline>::iterator& contentIte)
+    void recite(vector<playline>::iterator &contentIte)
     {
         unique_lock<mutex> lock(current_mutex);
         data_cond.wait(lock, [this, &contentIte] {
@@ -105,12 +106,13 @@ class player
 {
 private:
     vector<playline> contents;
-    string* playName;
-    ifstream* input;
-    play* current_play;
+    string *playName;
+    ifstream *input;
+    play *current_play;
     thread *current_thread;
+
 public:
-    player(play& obj, string &playerName, ifstream &input)
+    player(play &obj, string &playerName, ifstream &input)
     {
         this->playName = &playerName;
         this->input = &input;
@@ -148,7 +150,7 @@ public:
     void act()
     {
         vector<playline>::iterator current_begin = contents.begin();
-        for (; current_begin < contents.end(); )
+        for (; current_begin < contents.end();)
         {
             current_play->recite(current_begin);
         }
@@ -167,50 +169,50 @@ public:
     }
 };
 
-string& trim(string& ss) // used to remove the beginning spaces from each given string
+string &trim(string &ss) // used to remove the beginning spaces from each given string
 {
     string::size_type pos = ss.find_first_not_of(" \t");
     ss = ss.substr(pos);
     return ss;
 }
-bool is_number(string& s) // used to judge whether given string is Integer or not.
+bool is_number(string &s) // used to judge whether given string is Integer or not.
 {
     string::const_iterator it = s.begin();
     while (it != s.end() && std::isdigit(*it))
         ++it;
     return !s.empty() && it == s.end();
 }
-void threadProcess(play& currentPlay, const string& rolename, ifstream& input)
-{
-    if (input.is_open())
-        while (!input.eof())
-        {
+// void threadProcess(play &currentPlay, const string &rolename, ifstream &input)
+// {
+//     if (input.is_open())
+//         while (!input.eof())
+//         {
 
-            playline newLine;
-            string line;
-            getline(input, line);
-            if (line.empty() || line == " ") // Check given line is empty or only have space. if yes, continue.
-            {
-                continue;
-            }
-            string::size_type pos;
-            pos = line.find(' ', 0); // split given line text from first space.
-            string thisLineNumber, thisLineText;
-            thisLineNumber = line.substr(0, pos);
-            thisLineText = line.substr(pos + 1);
-            if (thisLineText.empty() || !is_number(thisLineNumber)) // judge two part of string is legal or not. first part need to be a Integer, second part should not be equal to empty string
-            {
-                continue;
-            }
-            newLine.linenumber = stoi(thisLineNumber);
-            newLine.linetext = trim(thisLineText);
-            newLine.rolename = rolename;
-            currentPlay << newLine; // Insert new playline to playline vector inside play class.
-        }
-    input.close();
-}
+//             playline newLine;
+//             string line;
+//             getline(input, line);
+//             if (line.empty() || line == " ") // Check given line is empty or only have space. if yes, continue.
+//             {
+//                 continue;
+//             }
+//             string::size_type pos;
+//             pos = line.find(' ', 0); // split given line text from first space.
+//             string thisLineNumber, thisLineText;
+//             thisLineNumber = line.substr(0, pos);
+//             thisLineText = line.substr(pos + 1);
+//             if (thisLineText.empty() || !is_number(thisLineNumber)) // judge two part of string is legal or not. first part need to be a Integer, second part should not be equal to empty string
+//             {
+//                 continue;
+//             }
+//             newLine.linenumber = stoi(thisLineNumber);
+//             newLine.linetext = trim(thisLineText);
+//             newLine.rolename = rolename;
+//             currentPlay << newLine; // Insert new playline to playline vector inside play class.
+//         }
+//     input.close();
+// }
 
-int main(int argc, const char* argv[])
+int main(int argc, const char *argv[])
 {
     // insert code here...
     string configName = argv[1];
@@ -236,6 +238,7 @@ int main(int argc, const char* argv[])
                 break;
             }
             play newPlay(currentplayname);
+            vector<player> player_list;
             while (!myReadFile.eof()) // read following lines, invoke each line with a separated thread and join them after invoked.
             {
                 string currentLine;
@@ -261,11 +264,17 @@ int main(int argc, const char* argv[])
                 }
                 ifstream newRole;
                 newRole.open(currentFile);
-                thread current_thread(threadProcess, ref(newPlay), currentRole, ref(newRole));
-                current_thread.join();
+                player role(ref(newPlay), currentRole, ref(newRole));
+                player_list.push_back(move(role));
             }
-            newPlay.print(cout); // using print function to all contents inside the play class in given format.
-            myReadFile.close();
+            for (int i = 0; i < player_list.size(); i++)
+            {
+                player_list[i].enter();
+            }
+            for (int i = 0; i < player_list.size(); i++)
+            {
+                player_list[i].exit();
+            }
             return 0;
         }
         else
@@ -274,7 +283,7 @@ int main(int argc, const char* argv[])
             return 1;
         }
     }
-    catch (exception & e)
+    catch (exception &e)
     {
         cout << e.what() << endl;
         return 1;
