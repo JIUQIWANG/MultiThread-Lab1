@@ -30,7 +30,7 @@ class play
 private:
     string playName;
     int counter;
-    static string current_player;
+    string current_player;
 
 public:
     explicit play(string name) : playName(move(name)), counter(1)
@@ -102,6 +102,20 @@ public:
         data_cond.notify_all();
     }
 };
+
+string &trim(string &ss) // used to remove the beginning spaces from each given string
+{
+    string::size_type pos = ss.find_first_not_of(" \t");
+    ss = ss.substr(pos);
+    return ss;
+}
+bool is_number(string &s) // used to judge whether given string is Integer or not.
+{
+    string::const_iterator it = s.begin();
+    while (it != s.end() && std::isdigit(*it))
+        ++it;
+    return !s.empty() && it == s.end();
+}
 class player
 {
 private:
@@ -117,7 +131,7 @@ public:
         this->playName = &playerName;
         this->input = &input;
         this->current_play = &obj;
-        current_thread = &thread();
+        current_thread = NULL;
     }
     void read()
     {
@@ -169,19 +183,6 @@ public:
     }
 };
 
-string &trim(string &ss) // used to remove the beginning spaces from each given string
-{
-    string::size_type pos = ss.find_first_not_of(" \t");
-    ss = ss.substr(pos);
-    return ss;
-}
-bool is_number(string &s) // used to judge whether given string is Integer or not.
-{
-    string::const_iterator it = s.begin();
-    while (it != s.end() && std::isdigit(*it))
-        ++it;
-    return !s.empty() && it == s.end();
-}
 // void threadProcess(play &currentPlay, const string &rolename, ifstream &input)
 // {
 //     if (input.is_open())
