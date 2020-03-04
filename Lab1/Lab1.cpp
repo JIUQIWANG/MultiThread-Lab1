@@ -25,53 +25,18 @@ bool comparisonPlayLine(const playline &a, const playline &b) // compare functio
 {
     return a.linenumber < b.linenumber;
 }
+string current_player;
 class play
 {
 private:
     string playName;
     int counter;
-    string current_player;
 
 public:
     explicit play(string name) : playName(move(name)), counter(1)
     {
     }
-    //play& operator<<(const playline& argument)
-    //{
-    //    lock_guard<mutex> guard(current_mutex); // Every time we get access to the contents list, we need to acquire the mutex first.
-    //    contents.push_back(argument);
-    //    return *this;
-    //}
-    string getName()
-    {
-        return playName;
-    }
-    //void print(ostream& theStream)
-    //{
-    //    lock_guard<mutex> guard(current_mutex);
-    //    sort(contents.begin(), contents.end(), comparisonPlayLine); // sort the class member vector by using the number of line.
-    //    string current;
 
-    //    for (int i = 0; i < contents.size(); i++) // print the playline one by one.
-    //    {
-    //        if (i == 0)
-    //        {
-    //            theStream << contents[i].rolename << "." << endl;
-    //            theStream << contents[i].linetext << endl;
-    //            current = contents[i].rolename;
-    //        }
-    //        else
-    //        {
-    //            if (current != contents[i].rolename)
-    //            {
-    //                theStream << endl;
-    //                theStream << contents[i].rolename << "." << endl;
-    //                current = contents[i].rolename;
-    //            }
-    //            theStream << contents[i].linetext << endl;
-    //        }
-    //    }
-    //}
     void recite(vector<playline>::iterator &contentIte)
     {
         unique_lock<mutex> lock(current_mutex);
@@ -120,21 +85,22 @@ class player
 {
 private:
     vector<playline> contents;
-    string *playName;
+    string playName;
     ifstream *input;
     play *current_play;
     thread *current_thread;
 
 public:
-    player(play &obj, string &playerName, ifstream &input)
+    player(play &obj, string playerName, ifstream &input)
     {
-        this->playName = &playerName;
+        this->playName = playerName;
         this->input = &input;
         this->current_play = &obj;
         current_thread = NULL;
     }
     void read()
     {
+
         if (input->is_open())
         {
             while (!input->eof())
@@ -157,7 +123,8 @@ public:
                 }
                 newLine.linenumber = stoi(thisLineNumber);
                 newLine.linetext = trim(thisLineText);
-                newLine.rolename = *playName;
+                newLine.rolename = playName;
+                contents.push_back(newLine);
             }
         }
     }
@@ -172,7 +139,7 @@ public:
     }
     void enter()
     {
-        current_thread = move(new thread([this] {read(); act(); }));
+        current_thread = new thread([this] {read(); act(); });
     }
     void exit()
     {
@@ -183,40 +150,18 @@ public:
     }
 };
 
-// void threadProcess(play &currentPlay, const string &rolename, ifstream &input)
-// {
-//     if (input.is_open())
-//         while (!input.eof())
-//         {
-
-//             playline newLine;
-//             string line;
-//             getline(input, line);
-//             if (line.empty() || line == " ") // Check given line is empty or only have space. if yes, continue.
-//             {
-//                 continue;
-//             }
-//             string::size_type pos;
-//             pos = line.find(' ', 0); // split given line text from first space.
-//             string thisLineNumber, thisLineText;
-//             thisLineNumber = line.substr(0, pos);
-//             thisLineText = line.substr(pos + 1);
-//             if (thisLineText.empty() || !is_number(thisLineNumber)) // judge two part of string is legal or not. first part need to be a Integer, second part should not be equal to empty string
-//             {
-//                 continue;
-//             }
-//             newLine.linenumber = stoi(thisLineNumber);
-//             newLine.linetext = trim(thisLineText);
-//             newLine.rolename = rolename;
-//             currentPlay << newLine; // Insert new playline to playline vector inside play class.
-//         }
-//     input.close();
-// }
-
 int main(int argc, const char *argv[])
 {
     // insert code here...
-    string configName = argv[1];
+    string configName;
+    current_player = "";
+    if (argc == 2)
+        configName = argv[1];
+    else
+    {
+        cout << "usage: " << argv[PROGRAM_NAME] << " <configuration_file_name>" << endl;
+        return 1;
+    }
     try
     {
         if (configName.empty())
@@ -225,7 +170,6 @@ int main(int argc, const char *argv[])
             return 1;
         }
         ifstream myReadFile(configName);
-
         if (myReadFile.is_open())
         {
             string currentplayname;
@@ -239,7 +183,8 @@ int main(int argc, const char *argv[])
                 break;
             }
             play newPlay(currentplayname);
-            vector<player> player_list;
+            vector<player *> player_list;
+            vector<ifstream *> ifsteamList;
             while (!myReadFile.eof()) // read following lines, invoke each line with a separated thread and join them after invoked.
             {
                 string currentLine;
@@ -258,23 +203,24 @@ int main(int argc, const char *argv[])
                 string currentRole, currentFile;
                 getline(ss, currentRole, ' ');
                 getline(ss, currentFile, ' ');
+
                 if (currentRole.empty() || currentFile.empty())
                 {
                     cout << "bad formated line" << endl;
                     continue;
                 }
-                ifstream newRole;
-                newRole.open(currentFile);
-                player role(ref(newPlay), currentRole, ref(newRole));
-                player_list.push_back(move(role));
+                ifsteamList.push_back(new ifstream(currentFile));
+                // ifstream newRole;
+                // newRole.open(currentFile);
+                player_list.push_back(new player(ref(newPlay), currentRole, ref(*ifsteamList.back())));
             }
             for (int i = 0; i < player_list.size(); i++)
             {
-                player_list[i].enter();
+                player_list[i]->enter();
             }
             for (int i = 0; i < player_list.size(); i++)
             {
-                player_list[i].exit();
+                player_list[i]->exit();
             }
             return 0;
         }
